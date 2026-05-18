@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Charging Detector</title>
+
+<style>
+    body {
+        margin: 0;
+        height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        background: #111;
+        color: white;
+        font-family: Arial, sans-serif;
+        font-size: 40px;
+    }
+
+    #status {
+        padding: 20px 40px;
+        border: 2px solid white;
+        border-radius: 12px;
+    }
+</style>
+</head>
+<body>
+
+<div id="status"></div>
+
+<script>
+async function checkBattery() {
+    if (!navigator.getBattery) {
+        document.getElementById("status").innerText = "Not Supported";
+        return;
+    }
+
+    const battery = await navigator.getBattery();
+    const status = document.getElementById("status");
+
+    function updateStatus() {
+        if (battery.charging) {
+            status.innerText = "Charging";
+        } else {
+            status.innerText = "";
+        }
+    }
+
+    battery.addEventListener("chargingchange", updateStatus);
+
+    updateStatus();
+}
+
+checkBattery();
+</script>
+
+</body>
+</html>
