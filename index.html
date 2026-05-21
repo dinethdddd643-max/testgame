@@ -15,17 +15,64 @@
         color: white;
         font-family: Arial, sans-serif;
         font-size: 40px;
+        flex-direction: column;
+        gap: 30px;
     }
     #status {
         padding: 20px 40px;
         border: 2px solid white;
         border-radius: 12px;
     }
+    #unlock-btn {
+        font-size: 20px;
+        padding: 12px 28px;
+        border: 2px solid #888;
+        border-radius: 10px;
+        background: transparent;
+        color: #aaa;
+        cursor: pointer;
+    }
+    #unlock-btn.unlocked {
+        border-color: #4caf50;
+        color: #4caf50;
+    }
 </style>
 </head>
 <body>
 <div id="status"></div>
+<button id="unlock-btn">Tap to enable sounds</button>
+
 <script>
+const plugSound = new Audio("plug.mp3");
+const unplugSound = new Audio("unplug.mp3");
+
+let soundTimer = null;
+let audioUnlocked = false;
+
+// When the user taps the button, we silently play both sounds
+// at volume 0 for a tiny moment. This satisfies the browser's
+// "user gesture required" rule, unlocking audio for all future plays.
+document.getElementById("unlock-btn").addEventListener("click", () => {
+    plugSound.volume = 0;
+    unplugSound.volume = 0;
+
+    plugSound.play().then(() => plugSound.pause());
+    unplugSound.play().then(() => unplugSound.pause());
+
+    // Restore normal volume after unlocking
+    plugSound.volume = 1;
+    unplugSound.volume = 1;
+    plugSound.currentTime = 0;
+    unplugSound.currentTime = 0;
+
+    audioUnlocked = true;
+
+    const btn = document.getElementById("unlock-btn");
+    btn.textContent = "✓ Sounds enabled";
+    btn.classList.add("unlocked");
+    btn.disabled = true;
+});
+
 async function checkBattery() {
     if (!navigator.getBattery) {
         document.getElementById("status").innerText = "Not Supported";
@@ -35,33 +82,24 @@ async function checkBattery() {
     const battery = await navigator.getBattery();
     const status = document.getElementById("status");
 
-    // Create two Audio objects pointing to your MP3 files
-    const plugSound = new Audio("plug1.mp3");
-    const unplugSound = new Audio("unplug1.mp3");
-
-    // This variable holds a pending timer so we can cancel it if needed
-    let soundTimer = null;
-
     function updateStatus() {
-        // Cancel any previously scheduled sound (edge case: rapid plug/unplug)
         clearTimeout(soundTimer);
 
         if (battery.charging) {
             status.innerText = "Charging";
-
-            // Wait 2 seconds, then play the plug sound
             soundTimer = setTimeout(() => {
-                plugSound.currentTime = 0; // rewind to start in case it was played before
-                plugSound.play();
+                if (audioUnlocked) {
+                    plugSound.currentTime = 0;
+                    plugSound.play();
+                }
             }, 2000);
-
         } else {
             status.innerText = "";
-
-            // Wait 2 seconds, then play the unplug sound
             soundTimer = setTimeout(() => {
-                unplugSound.currentTime = 0;
-                unplugSound.play();
+                if (audioUnlocked) {
+                    unplugSound.currentTime = 0;
+                    unplugSound.play();
+                }
             }, 2000);
         }
     }
