@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Charging Detector</title>
-
 <style>
     body {
         margin: 0;
@@ -17,7 +16,6 @@
         font-family: Arial, sans-serif;
         font-size: 40px;
     }
-
     #status {
         padding: 20px 40px;
         border: 2px solid white;
@@ -26,9 +24,7 @@
 </style>
 </head>
 <body>
-
 <div id="status"></div>
-
 <script>
 async function checkBattery() {
     if (!navigator.getBattery) {
@@ -39,21 +35,42 @@ async function checkBattery() {
     const battery = await navigator.getBattery();
     const status = document.getElementById("status");
 
+    // Create two Audio objects pointing to your MP3 files
+    const plugSound = new Audio("plug.mp3");
+    const unplugSound = new Audio("unplug.mp3");
+
+    // This variable holds a pending timer so we can cancel it if needed
+    let soundTimer = null;
+
     function updateStatus() {
+        // Cancel any previously scheduled sound (edge case: rapid plug/unplug)
+        clearTimeout(soundTimer);
+
         if (battery.charging) {
             status.innerText = "Charging";
+
+            // Wait 2 seconds, then play the plug sound
+            soundTimer = setTimeout(() => {
+                plugSound.currentTime = 0; // rewind to start in case it was played before
+                plugSound.play();
+            }, 2000);
+
         } else {
             status.innerText = "";
+
+            // Wait 2 seconds, then play the unplug sound
+            soundTimer = setTimeout(() => {
+                unplugSound.currentTime = 0;
+                unplugSound.play();
+            }, 2000);
         }
     }
 
     battery.addEventListener("chargingchange", updateStatus);
-
     updateStatus();
 }
 
 checkBattery();
 </script>
-
 </body>
 </html>
