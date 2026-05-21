@@ -43,27 +43,27 @@
 <button id="unlock-btn">Tap to enable sounds</button>
 
 <script>
-const plugSound = new Audio("plug.mp3");
+const plugSound  = new Audio("plug.mp3");
 const unplugSound = new Audio("unplug.mp3");
+const plug2Sound  = new Audio("plug2.mp3");
+const plug3Sound  = new Audio("plug3.mp3");
 
-let soundTimer = null;
+let soundTimer   = null; // 2-second delay for plug/unplug sounds
+let warningTimer = null; // 10-second countdown after unplugging
+
+// --- Rapid switching detection ---
+let switchTimestamps = []; // stores the time of each recent switch
+let isFrantic        = false; // true while plug3.mp3 is playing
+
 let audioUnlocked = false;
 
-// When the user taps the button, we silently play both sounds
-// at volume 0 for a tiny moment. This satisfies the browser's
-// "user gesture required" rule, unlocking audio for all future plays.
 document.getElementById("unlock-btn").addEventListener("click", () => {
-    plugSound.volume = 0;
-    unplugSound.volume = 0;
-
-    plugSound.play().then(() => plugSound.pause());
-    unplugSound.play().then(() => unplugSound.pause());
-
-    // Restore normal volume after unlocking
-    plugSound.volume = 1;
-    unplugSound.volume = 1;
-    plugSound.currentTime = 0;
-    unplugSound.currentTime = 0;
+    [plugSound, unplugSound, plug2Sound, plug3Sound].forEach(s => {
+        s.volume = 0;
+        s.play().then(() => s.pause());
+        s.volume = 1;
+        s.currentTime = 0;
+    });
 
     audioUnlocked = true;
 
@@ -72,6 +72,43 @@ document.getElementById("unlock-btn").addEventListener("click", () => {
     btn.classList.add("unlocked");
     btn.disabled = true;
 });
+
+function playSound(sound) {
+    if (!audioUnlocked) return;
+    sound.currentTime = 0;
+    sound.play();
+}
+
+function stopSound(sound) {
+    sound.pause();
+    sound.currentTime = 0;
+}
+
+function checkFrantic() {
+    const now = Date.now(); // current time in milliseconds
+
+    // Add this switch moment to the log
+    switchTimestamps.push(now);
+
+    // Throw away any timestamps older than 1 second
+    // so we're only ever looking at switches in the last 1000ms
+    switchTimestamps = switchTimestamps.filter(t => now - t <= 1000);
+
+    // If 5 or more switches happened within that 1-second window → frantic!
+    if (switchTimestamps.length >= 5 && !isFrantic) {
+        isFrantic = true;
+
+        // Cancel normal sounds — don't want plug/unplug/warning playing over this
+        clearTimeout(soundTimer);
+        clearTimeout(warningTimer);
+        stopSound(plugSound);
+        stopSound(unplugSound);
+
+        // Loop plug3.mp3 continuously while frantic
+        plug3Sound.loop = true;
+        playSound(plug3Sound);
+    }
+}
 
 async function checkBattery() {
     if (!navigator.getBattery) {
@@ -83,24 +120,43 @@ async function checkBattery() {
     const status = document.getElementById("status");
 
     function updateStatus() {
+        // Record this switch for frantic detection
+        checkFrantic();
+
+        // Always cancel pending sound delay
         clearTimeout(soundTimer);
 
         if (battery.charging) {
             status.innerText = "Charging";
+
+            // Cancel the 10-second warning — user plugged back in
+            clearTimeout(warningTimer);
+            warningTimer = null;
+
+            // If frantic mode is active and charger is now stably plugged in, stop it
+            if (isFrantic) {
+                isFrantic = false;
+                switchTimestamps = []; // reset the switch log
+                stopSound(plug3Sound);
+            }
+
+            // Play plug sound after 2 seconds (only if not frantic)
             soundTimer = setTimeout(() => {
-                if (audioUnlocked) {
-                    plugSound.currentTime = 0;
-                    plugSound.play();
-                }
+                if (!isFrantic) playSound(plugSound);
             }, 2000);
+
         } else {
             status.innerText = "";
-            soundTimer = setTimeout(() => {
-                if (audioUnlocked) {
-                    unplugSound.currentTime = 0;
-                    unplugSound.play();
-                }
-            }, 2000);
+
+            // Don't start warning or unplug sound while frantic
+            if (!isFrantic) {
+                soundTimer = setTimeout(() => playSound(unplugSound), 2000);
+
+                warningTimer = setTimeout(() => {
+                    playSound(plug2Sound);
+                    warningTimer = null;
+                }, 10000);
+            }
         }
     }
 
