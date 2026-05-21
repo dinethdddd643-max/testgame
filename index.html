@@ -92,7 +92,7 @@ function checkFrantic() {
 
     // Throw away any timestamps older than 1 second
     // so we're only ever looking at switches in the last 1000ms
-    switchTimestamps = switchTimestamps.filter(t => now - t <= 1000);
+    switchTimestamps = switchTimestamps.filter(t => now - t <= 10000);
 
     // If 5 or more switches happened within that 1-second window → frantic!
     if (switchTimestamps.length >= 5 && !isFrantic) {
